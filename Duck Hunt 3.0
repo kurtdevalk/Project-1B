@@ -1,0 +1,274 @@
+#Author's name: Kurtis De Valk
+#Last Modified by: Kurtis De Valk & Michael Duncan
+#Date last Modified: August. 15, 2013 
+#Program description: Duck Hunt
+#Revision History: 3.0
+
+import pygame, random
+pygame.init()
+
+screen = pygame.display.set_mode((800, 600))
+
+# create a cross hair class that allows the player to shot
+
+class Pointer(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load("images/Crosshair.gif")
+        self.image = pygame.transform.scale(self.image, (40, 40))
+        self.rect = self.image.get_rect()
+    
+    def update(self):
+
+        mousex, mousey = pygame.mouse.get_pos()
+        self.rect.center = (mousex, mousey)
+    
+        
+class Duck(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load("images/duckAlive.png")
+        self.rect = self.image.get_rect()
+        self.X = 0
+        self.Y = 0
+        self.speed = 5
+        self.reset()                
+        self.Dying = "Alive"        
+        self.bird = 1
+        self.birdchange = 0.3
+        
+        #add sound to duck class
+        
+        if not pygame.mixer:
+            print("problem with sound")
+        else:
+            pygame.mixer.init()
+            self.sndHitGround = pygame.mixer.Sound("sound/DuckHittingGround.ogg")
+        
+    def update(self):
+        
+        # create motion for the duck class
+        
+        if(self.Dying == "Dying"):
+            self.Y += 10
+            self.image = pygame.image.load("images/duckDead.png")
+        else:
+            self.bird += self.birdchange
+            if(self.bird > 1) and (self.bird < 2):
+                self.image = pygame.image.load("images/duckAlive.png")
+            elif(self.bird > 2) and (self.bird < 3):
+                self.image = pygame.image.load("images/duckAlive2.png")
+            elif(self.bird > 3):
+                self.bird = 1
+                
+            self.X += self.speed
+            self.Y += self.directY 
+            if self.X > 1000:
+                self.reset()
+                
+        self.rect.topleft = (self.X, self.Y)
+            
+    def reset(self):
+        self.rect.left = 0
+
+        self.X = -80
+        self.Y = random.randrange(50, 300)
+        self.directX = random.randrange(-2, 2)
+        self.directY = random.randrange(-2, 2)
+            
+def main():
+    
+    #play intro splash screen
+     
+    intro()
+    Font = pygame.font.SysFont("Arial", 30, True, False)
+    pygame.display.set_caption("Duck Hunt!")
+    
+    #define sound
+    
+    sndRoundIntro = pygame.mixer.Sound("sound/RoundIntro.ogg")
+    sndGunShot = pygame.mixer.Sound("sound/GunShot.ogg")
+                
+    #Load the game sprites, images & instructions
+
+    gameStarting = True
+    background = pygame.image.load("images/background2.png")
+    instrLabel = Font.render("SHOT 10 DUCKS TO ADVANCE!", 1, (255, 255, 255))
+    pointer = Pointer()
+    ducks = []
+    ducks.append(Duck())
+    ducks.append(Duck())
+    scoreLabel = Font.render("0", 1, (0, 0 , 0))
+    scoreTitle = Font.render("Score:", 1, (0, 0, 0))
+    score = 0
+    bulletLabel = Font.render("15", 1, (0, 0, 0))
+    bulletTitle = Font.render("Bullets:", 1, (0, 0, 0))
+    bullets = 15
+    roundLabel = Font.render("Round", 1, (0, 0, 0))
+    round = 1
+    totalScore = 0
+    speed = 5
+    friendSprites = pygame.sprite.Group(pointer)
+    duckSprites = pygame.sprite.Group(ducks)
+    clock = pygame.time.Clock()
+        
+    keepGoing = True
+    while keepGoing:
+        clock.tick(30)
+        if(gameStarting):
+            background = pygame.image.load("images/roundBackground.png")
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    keepGoing = False
+                elif event.type == pygame.KEYDOWN:
+                    background = pygame.image.load("images/background2.png")
+                    gameStarting = False
+            screen.blit(background, (0, 0))
+            roundLabel = Font.render("Round %d" % round, 1 ,(0, 0, 0))
+            screen.blit(roundLabel, (350, 255))
+            screen.blit(instrLabel, (215, 310))
+            
+        else:
+            pygame.mouse.set_visible(False)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    keepGoing = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    sndGunShot.play()
+                    bullets -= 1
+                    bulletLabel = Font.render("%d" % bullets, 1 ,(0, 0, 0))
+                    
+                    #create game over scenario
+                    
+                    if(bullets == 0):
+                        GameOver(totalScore)
+                        
+                        # reset all stats
+                        
+                        for duck in ducks:
+                            ducks.remove(duck)
+                        totalScore = 0
+                        score = 0
+                        bullets = 15
+                        speed = 5
+                        round = 1
+                        ducks.append(Duck())
+                        duckSprites.empty()
+                        duckSprites = pygame.sprite.Group(ducks)
+                        screen.blit(background, (0, 0))
+                        scoreLabel = Font.render("0", 1, (0, 0 , 0))
+                        bulletLabel = Font.render("15", 1,(0, 0, 0))
+                        screen.blit(scoreLabel, (730, 525))
+                        screen.blit(scoreTitle, (635, 525))
+                        screen.blit(bulletLabel, (145, 525))
+                        screen.blit(bulletTitle, (45, 525))
+                    
+                    #create hit detection when firing at the ducks
+                    
+                    elif(pygame.sprite.groupcollide(friendSprites, duckSprites, False, False)):
+                        for duck in ducks:  
+                            if(pygame.sprite.collide_mask(pointer, duck)):
+                                duck.Dying = "Dying"
+            
+            #increment the rounds for added difficulty
+            if (score >= 10):
+                sndRoundIntro.play()
+                gameStarting = True
+                bullets = 15
+                bulletLabel = Font.render("15", 1, (0, 0, 0))
+                round += 1
+                score = 0
+                speed *= 1.5   
+            
+            # create a "dying" parameter
+                        
+            for duck in ducks:
+                duck.speed = speed
+                if(duck.Dying == "Dying"):
+                    if duck.Y > 300:
+                        duck.sndHitGround.play()
+                        score += 1
+                        totalScore += 1
+                        scoreLabel = Font.render(str(totalScore), 1, (0, 0, 0))
+                        print duck.Y
+                        ducks.remove(duck)
+                        ducks.append(Duck())
+                        duckSprites = pygame.sprite.Group(ducks)
+                else:
+                    duck.X += duck.speed
+            
+            #display and update all images and sprites        
+            screen.blit(background, (0, 0))
+            screen.blit(scoreLabel, (730, 525))
+            screen.blit(scoreTitle, (635, 525))
+            screen.blit(bulletLabel, (145, 525))
+            screen.blit(bulletTitle, (45, 525))
+            duckSprites.update()
+            duckSprites.draw(screen)
+            friendSprites.update()
+            friendSprites.draw(screen)
+            
+        pygame.display.flip() 
+            
+    #return mouse cursor
+    
+    pygame.mouse.set_visible(True) 
+
+#create a splash screen
+
+def intro():
+    
+    background = pygame.image.load("images/title.png")
+    keepGoing = True
+    clock = pygame.time.Clock()
+    timer = 0
+    timerSpeed = 0.035
+    sndTheme = pygame.mixer.Sound("sound/Theme.ogg")
+    sndTheme.play()
+    
+    while (keepGoing):
+        clock.tick(30)
+        timer += timerSpeed
+        if (timer > 10):
+            keepGoing = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            elif event.type == pygame.KEYDOWN:
+                sndTheme.stop()
+                keepGoing = False
+        screen.blit(background, (272, 180))
+        pygame.display.flip()
+
+#create a game over screen
+        
+def GameOver(totalScore):
+    
+    Font = pygame.font.SysFont("Arial", 30, True, False)
+    background = pygame.image.load("images/GameOver.png")
+    keepGoing = True
+    clock = pygame.time.Clock()
+    timer = 0
+    timerSpeed = 0.035
+    scoreLabel = Font.render("SCORE: %d" % totalScore, 1, (255, 255, 255))
+    retryLabel = Font.render("PLAY AGAIN? HIT ANY KEY", 1, (255, 255, 255))
+    sndGameOver = pygame.mixer.Sound("sound/GameOver.ogg")
+    sndGameOver.play()
+    
+    while (keepGoing):
+        clock.tick(30)
+        timer += timerSpeed
+        if (timer > 10):
+            keepGoing = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            elif event.type == pygame.KEYDOWN:
+                keepGoing = False
+        screen.blit(background, (0, 0)) 
+        screen.blit(scoreLabel, (330, 350))
+        screen.blit(retryLabel, (225, 400))
+        pygame.display.flip() 
+        
+if __name__ == '__main__':
+    main()
